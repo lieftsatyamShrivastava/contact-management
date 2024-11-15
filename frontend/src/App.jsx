@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Button,
   TextField,
@@ -17,6 +18,8 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 
+const API_BASE_URL = 'http://localhost:5000';
+
 export default function Component() {
   const [contacts, setContacts] = useState([]);
   const [formData, setFormData] = useState({
@@ -29,31 +32,50 @@ export default function Component() {
   });
   const [editingId, setEditingId] = useState(null);
 
+  useEffect(() => {
+    async function fetchContacts() {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/contacts`);
+        setContacts(response.data);
+      } catch (error) {
+        console.error('Error fetching contacts:', error);
+      }
+    }
+
+    fetchContacts();
+  }, []);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingId !== null) {
-      setContacts((prev) =>
-        prev.map((contact) =>
-          contact.id === editingId ? { ...contact, ...formData } : contact
-        )
-      );
-      setEditingId(null);
-    } else {
-      setContacts((prev) => [...prev, { id: Date.now(), ...formData }]);
+
+    try {
+      if (editingId !== null) {
+        const response = await axios.put(`${API_BASE_URL}/contacts/${editingId}`, formData);
+        setContacts((prev) =>
+          prev.map((contact) => (contact.id === editingId ? response.data : contact))
+        );
+        setEditingId(null);
+      } else {
+        const response = await axios.post(`${API_BASE_URL}/contacts`, formData);
+        setContacts((prev) => [...prev, response.data]);
+      }
+
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        company: '',
+        jobTitle: '',
+      });
+    } catch (error) {
+      console.error('Error saving contact:', error);
     }
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      phoneNumber: '',
-      company: '',
-      jobTitle: '',
-    });
   };
 
   const handleEdit = (contact) => {
@@ -61,8 +83,13 @@ export default function Component() {
     setEditingId(contact.id);
   };
 
-  const handleDelete = (id) => {
-    setContacts((prev) => prev.filter((contact) => contact.id !== id));
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/contacts/${id}`);
+      setContacts((prev) => prev.filter((contact) => contact.id !== id));
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+    }
   };
 
   return (
@@ -72,6 +99,7 @@ export default function Component() {
       </Typography>
       <form onSubmit={handleSubmit}>
         <Grid container spacing={2} sx={{ marginBottom: 2 }}>
+          {/* Form Fields */}
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
@@ -97,7 +125,6 @@ export default function Component() {
               fullWidth
               label="Email"
               name="email"
-              type="email"
               value={formData.email}
               onChange={handleInputChange}
               required
@@ -110,7 +137,6 @@ export default function Component() {
               name="phoneNumber"
               value={formData.phoneNumber}
               onChange={handleInputChange}
-              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
